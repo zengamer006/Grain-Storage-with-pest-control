@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="Secure ESP32 IoT dashboard for crop diagnosis, storage quality monitoring, authenticated sensor telemetry, and experimental LSTM-based predictions.">
+
+  <title>SGN | Smart Crop &amp; Storage Quality Dashboard</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">SECURE IoT TELEMETRY · ESP32 · AI/ML</p>
+      <h1>Smart Crop &amp; Storage Quality Dashboard</h1>
+      <p class="sub">
+        Authenticated sensor readings · Real-time monitoring · LSTM inference
+      </p>
+    </div>
+
+    <div id="connection" class="pill" role="status" aria-live="polite">
+      Connecting…
+    </div>
+  </header>
+
+  <main>
+    <!-- =================================================
+         LIVE SENSOR READINGS
+    ================================================== -->
+    <section aria-labelledby="liveSensorsHeading">
+      <h2 id="liveSensorsHeading">Live Sensor Readings</h2>
+
+      <p class="muted">
+        Sensor readings update automatically when authenticated ESP32
+        telemetry is received.
+      </p>
+
+      <div class="grid">
+        <article class="card">
+          <p>DS18B20 Temperature #1</p>
+          <h2 id="ds1">—</h2>
+          <small id="ds1note">Waiting for data</small>
+        </article>
+
+        <article class="card">
+          <p>DS18B20 Temperature #2</p>
+          <h2 id="ds2">—</h2>
+          <small id="ds2note">Waiting for data</small>
+        </article>
+
+        <article class="card">
+          <p>DHT22 Temperature</p>
+          <h2 id="temp">—</h2>
+          <small>°C</small>
+        </article>
+
+        <article class="card">
+          <p>Relative Humidity</p>
+          <h2 id="humidity">—</h2>
+          <small>% RH</small>
+        </article>
+
+        <article class="card">
+          <p>MQ-135 Gas Sensor</p>
+          <h2 id="mq4">—</h2>
+          <small id="mq4">
+            Digital state or relative signal, depending on sensor data
+          </small>
+        </article>
+
+        <article class="card">
+          <p>MQ-4 Gas Sensor</p>
+          <h2 id="mq135">—</h2>
+          <small id="mq135note">
+            Digital state or relative signal, depending on sensor data
+          </small>
+        </article>
+
+        <article class="card">
+          <p>Load Cell Weight</p>
+          <h2 id="weight">—</h2>
+          <small id="weightnote">Waiting for data</small>
+        </article>
+
+        <article class="card">
+          <p>Microphone Average</p>
+          <h2 id="micAverage">—</h2>
+          <small>Raw ADC reading</small>
+        </article>
+
+        <article class="card">
+          <p>Microphone Peak-to-Peak</p>
+          <h2 id="micPeakToPeak">—</h2>
+          <small id="micnote">Raw ADC range</small>
+        </article>
+
+        <article class="card">
+          <p>CO₂ Level</p>
+          <h2 id="co2">—</h2>
+          <small id="co2note">
+            No calibrated CO₂ measurement available
+          </small>
+        </article>
+      </div>
+    </section>
+
+    <!-- =================================================
+         CONNECTION AND SECURITY
+    ================================================== -->
+    <section class="grid secondary" aria-label="System status">
+      <article class="panel">
+        <h2>Security &amp; Connection</h2>
+
+        <dl>
+          <dt>Serial Port</dt>
+          <dd id="port">—</dd>
+
+          <dt>Authenticated Packets</dt>
+          <dd id="accepted">0</dd>
+
+          <dt>Rejected Packets</dt>
+          <dd id="rejected">0</dd>
+
+          <dt>Last Packet</dt>
+          <dd id="lastPacket">—</dd>
+
+          <dt>Last Error</dt>
+          <dd id="error">None</dd>
+        </dl>
+      </article>
+
+      <article class="panel">
+        <h2>Prediction Status</h2>
+
+        <div id="prediction" class="prediction" role="status" aria-live="polite">
+          Waiting for sensor data and diagnosis inputs.
+        </div>
+
+        <p class="muted">
+          Predictions use the configured LSTM model and preprocessing
+          artifacts when available. Results are experimental and must be
+          validated against real-world observations.
+        </p>
+
+        <p id="modelCo2Source" class="muted"></p>
+        <p id="modelCo2" class="muted"></p>
+      </article>
+    </section>
+
+    <!-- =================================================
+         CROP AND STORAGE DIAGNOSIS FORM
+    ================================================== -->
+    <section class="panel" aria-labelledby="diagnosisFormHeading">
+      <h2 id="diagnosisFormHeading">Crop &amp; Storage Diagnosis</h2>
+
+      <p class="muted">
+        Enter crop and inspection information below. Available temperature
+        and humidity readings are taken from the latest authenticated ESP32
+        packet. MQ sensor readings are treated as gas-sensor signals and
+        are not interpreted as calibrated CO₂ concentrations.
+      </p>
+
+      <form id="diagnosisForm">
+        <div class="grid form-grid">
+
+          <div class="field">
+            <label for="crop_type">1. Crop Type</label>
+            <select id="crop_type" name="crop_type" required>
+              <option value="Rice" selected>Rice</option>
+              <option value="Wheat">Wheat</option>
+              <option value="Maize">Maize</option>
+              <option value="Potato">Potato</option>
+              <option value="Cotton">Cotton</option>
+              <option value="Barley">Barley</option>
+              <option value="Sugarcane">Sugarcane</option>
+              <option value="Tomato">Tomato</option>
+              <option value="Soybean">Soybean</option>
+              <option value="Groundnut">Groundnut</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="soil_type">2. Soil Type</label>
+            <select id="soil_type" name="soil_type" required>
+              <option value="Clay" selected>Clay</option>
+              <option value="Loamy">Loamy</option>
+              <option value="Sandy">Sandy</option>
+              <option value="Silty">Silty</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="pest_type">3. Pest Observed</label>
+            <select id="pest_type" name="pest_type" required>
+              <option value="Beetle" selected>Beetle</option>
+              <option value="Aphids">Aphids</option>
+              <option value="Armyworm">Armyworm</option>
+              <option value="Leaf Miner">Leaf Miner</option>
+              <option value="Mite">Mite</option>
+              <option value="Stem Borer">Stem Borer</option>
+              <option value="Thrips">Thrips</option>
+              <option value="Whitefly">Whitefly</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="light_intensity_lux">4. Light Intensity (lux)</label>
+            <input
+              id="light_intensity_lux"
+              name="light_intensity_lux"
+              type="number"
+              min="0"
+              step="any"
+              value="550"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="pest_density">5. Pest Density (count)</label>
+            <input
+              id="pest_density"
+              name="pest_density"
+              type="number"
+              min="0"
+              step="any"
+              value="40"
+              required
+            >
+          </div>
+
+          <div class="field">
+            <label for="pesticide_usage_ml">6. Pesticide Usage (ml)</label>
+            <input
+              id="pesticide_usage_ml"
+              name="pesticide_usage_ml"
+              type="number"
+              min="0"
+              step="any"
+              value="45"
+              required
+            >
+          </div>
+        </div>
+
+        <!-- ADVANCED INPUTS -->
+        <details>
+          <summary>Advanced inputs and prototype defaults</summary>
+
+          <p class="muted">
+            Default values are prototype assumptions, not live measurements.
+            Replace them with measured values whenever available.
+          </p>
+
+          <div class="grid form-grid">
+            <div class="field">
+              <label for="wind_speed_kmph">Wind / Airflow (km/h)</label>
+              <input
+                id="wind_speed_kmph"
+                name="wind_speed_kmph"
+                type="number"
+                min="0"
+                step="any"
+                value="12"
+              >
+            </div>
+
+            <div class="field">
+              <label for="leaf_damage_percentage">Leaf Damage (%)</label>
+              <input
+                id="leaf_damage_percentage"
+                name="leaf_damage_percentage"
+                type="number"
+                min="0"
+                max="100"
+                step="any"
+                value="15"
+              >
+            </div>
+
+            <div class="field">
+              <label for="cnn_feature_score">CNN Feature Score</label>
+              <input
+                id="cnn_feature_score"
+                name="cnn_feature_score"
+                type="number"
+                min="0"
+                max="1"
+                step="any"
+                value="0.90"
+              >
+            </div>
+
+            <div class="field">
+              <label for="detection_confidence">Detection Confidence</label>
+              <input
+                id="detection_confidence"
+                name="detection_confidence"
+                type="number"
+                min="0"
+                max="1"
+                step="any"
+                value="0.90"
+              >
+            </div>
+
+            <div class="field">
+              <label for="latency_ms">Sensor Latency (ms)</label>
+              <input
+                id="latency_ms"
+                name="latency_ms"
+                type="number"
+                min="0"
+                step="any"
+                value="180"
+              >
+            </div>
+
+            <div class="field">
+              <label for="battery_level_percentage">Battery Level (%)</label>
+              <input
+                id="battery_level_percentage"
+                name="battery_level_percentage"
+                type="number"
+                min="0"
+                max="100"
+                step="any"
+                value="90"
+              >
+            </div>
+
+            <div class="field">
+              <label for="network_signal_strength">
+                Network Strength (1–5)
+              </label>
+              <input
+                id="network_signal_strength"
+                name="network_signal_strength"
+                type="number"
+                min="1"
+                max="5"
+                step="any"
+                value="4"
+              >
+            </div>
+
+            <div class="field">
+              <label for="control_action">Control Action</label>
+              <select id="control_action" name="control_action">
+                <option value="No_Action" selected>No Action</option>
+                <option value="Trap_Deployment">Trap Deployment</option>
+                <option value="Irrigation_Adjustment">
+                  Irrigation Adjustment
+                </option>
+                <option value="Biological_Control">Biological Control</option>
+                <option value="Chemical_Spray">Chemical Spray</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <p id="formMessage" role="status" aria-live="polite"></p>
+
+        <button id="predictButton" type="submit">
+          Run Crop Diagnosis
+        </button>
+      </form>
+    </section>
+
+    <!-- =================================================
+         DIAGNOSIS RESULTS
+    ================================================== -->
+    <section class="panel" aria-labelledby="reportHeading">
+      <h2 id="reportHeading">Diagnosis Report</h2>
+
+      <div id="diagnosisResult" aria-live="polite">
+        Submit the form to request a prediction.
+      </div>
+
+      <div id="probabilityBreakdown"></div>
+
+      <div id="assumptionsList"></div>
+    </section>
+
+    <!-- =================================================
+         FOOTER
+    ================================================== -->
+    <footer class="foot">
+      <p>
+        Secure IoT prototype · ESP32 telemetry · AES-GCM authentication
+        and encryption · Experimental machine-learning predictions
+      </p>
+
+      <p>
+        Sensor values are displayed only when supplied by the backend.
+        MQ-135 and MQ-4 readings do not represent calibrated gas
+        concentrations unless supported by appropriate calibration.
+      </p>
+    </footer>
+  </main>
+
+  <script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
+</body>
+</html>
